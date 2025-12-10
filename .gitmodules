@@ -9,4 +9,4 @@
 	url = git@github.com:mrheyday/v3-core.git
 [submodule "lib/v3-periphery"]
 	path = lib/v3-periphery
-	url = https://github.com/Uniswap/v3-periphery
+	url = git@github.com:mrheyday/v3-periphery.git
