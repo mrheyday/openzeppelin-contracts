@@ -1,0 +1,21 @@
+{
+  "name": "goddan-framework",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "sponsor:start": "node scripts/gelato_cli.js",
+    "sponsor:manager": "node scripts/gelato_manager.js",
+    "sponsor:sim-fork": "node scripts/sim_manager_against_fork.js",
+    "build": "echo build placeholder",
+    "test": "echo run foundry tests"
+  },
+  "dependencies": {
+    "@gelatonetwork/relay-sdk": "^3.0.0",
+    "axios": "^1.4.0",
+    "dotenv": "^16.0.0",
+    "ethers": "^6.9.0",
+    "prettier": "^3.7.4",
+    "prettier-plugin-solidity": "^2.2.0",
+    "sqlite3": "^5.1.0"
+  }
+}

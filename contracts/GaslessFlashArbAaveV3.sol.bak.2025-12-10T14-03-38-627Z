@@ -1,0 +1,181 @@
+ // SPDX-License-Identifier: MIT
+ pragma solidity ^0.8.20;
+
+ import "openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+ import "openzeppelin/contracts/utils/cryptography/EIP712.sol";
+
+ interface IHook {
+     function validate(address solver, uint256 expectedProfitWei, bytes32 actionsHash) external returns (bool);
+ }
+
+ interface IPool {
+     function flashLoanSimple(
+         address receiverAddress,
+         address asset,
+         uint256 amount,
+         bytes calldata params,
+         uint16 referralCode
+     ) external;
+ }
+
+ interface IFlashLoanSimpleReceiver {
+     function executeOperation(
+         address asset,
+         uint256 amount,
+         uint256 premium,
+         address initiator,
+         bytes calldata params
+     ) external returns (bool);
+ }
+
+ contract GaslessFlashArbAaveV3 is EIP712, IFlashLoanSimpleReceiver {
+     using ECDSA for bytes32;
+
+     address public owner;
+     IHook public hook;
+     address public treasury;
+
+     bytes32 public constant SOLVER_ORDER_TYPEHASH = keccak256(
+         "SolverOrder(address solver,uint256 expectedProfitWei,uint256 expiry,bytes32 actionsHash,uint256 nonce,uint256 chainId)"
+     );
+
+     struct SolverOrder {
+         address solver;
+         uint256 expectedProfitWei;
+         uint256 expiry;
+         bytes32 actionsHash;
+         uint256 nonce;
+         uint256 chainId;
+         address flashPool;
+         address flashAsset;
+         uint256 flashAmount;
+         bool executed;
+     }
+
+     mapping(bytes32 => SolverOrder) public orders;
+     mapping(address => uint256) public nonces;
+     uint8 private _locked;
+
+     event OrderSubmitted(bytes32 indexed digest, address indexed solver);
+     event ArbExecuted(bytes32 indexed digest, address indexed solver, uint256 profitWei);
+     event OwnerUpdated(address oldOwner, address newOwner);
+     event HookUpdated(address oldHook, address newHook);
+
+     modifier onlyOwner() {
+         require(msg.sender == owner, "Only owner");
+         _;
+     }
+
+     modifier nonReentrant() {
+         require(_locked == 0, "Reentrancy");
+         _locked = 1;
+         _;
+         _locked = 0;
+     }
+
+     constructor(address _hook, address _treasury) EIP712("GaslessFlashArbAaveV3", "1") {
+         owner = msg.sender;
+         hook = IHook(_hook);
+         treasury = _treasury;
+     }
+
+     function setHook(address _hook) external onlyOwner {
+         emit HookUpdated(address(hook), _hook);
+         hook = IHook(_hook);
+     }
+     function setOwner(address _owner) external onlyOwner {
+         emit OwnerUpdated(owner, _owner);
+         owner = _owner;
+     }
+
+     function submitOrderAndExecute(
+         SolverOrder calldata order,
+         bytes calldata signature,
+         bool useFlashloan,
+         address flashPool,
+         address flashAsset,
+         uint256 flashAmount,
+         bytes calldata actionsEncoded
+     ) external payable nonReentrant {
+         require(block.timestamp <= order.expiry, "Order expired");
+         require(order.chainId == block.chainid, "Wrong chain");
+         require(order.nonce == nonces[order.solver], "Nonce mismatch");
+
+         bytes32 structHash = keccak256(
+             abi.encode(
+                 SOLVER_ORDER_TYPEHASH,
+                 order.solver,
+                 order.expectedProfitWei,
+                 order.expiry,
+                 order.actionsHash,
+                 order.nonce,
+                 order.chainId
+             )
+         );
+         bytes32 digest = _hashTypedDataV4(structHash);
+
+         address signer = digest.recover(signature);
+         require(signer == order.solver, "Invalid signature");
+
+         require(hook.validate(order.solver, order.expectedProfitWei, order.actionsHash), "Hook validation failed");
+
+         SolverOrder memory stored = order;
+         stored.flashPool = flashPool;
+         stored.flashAsset = flashAsset;
+         stored.flashAmount = flashAmount;
+         stored.executed = false;
+         orders[digest] = stored;
+
+         nonces[order.solver] = order.nonce + 1;
+
+         emit OrderSubmitted(digest, order.solver);
+
+         if (useFlashloan) {
+             require(flashPool != address(0), "Missing flashPool");
+             bytes memory params = abi.encode(digest, actionsEncoded, msg.sender);
+             IPool(flashPool).flashLoanSimple(address(this), flashAsset, flashAmount, params, 0);
+         } else {
+             require(msg.value >= order.expectedProfitWei, "Insufficient profit provided");
+             _distributeProfitNative(order.solver, order.expectedProfitWei);
+             orders[digest].executed = true;
+             emit ArbExecuted(digest, order.solver, order.expectedProfitWei);
+         }
+     }
+
+     function executeOperation(
+         address /* asset */,
+         uint256 /* amount */,
+         uint256 /* premium */,
+         address /* initiator */,
+         bytes calldata params
+     ) external override nonReentrant returns (bool) {
+         (bytes32 digest, , ) = abi.decode(params, (bytes32, bytes, address));
+         SolverOrder storage order = orders[digest];
+         require(order.solver != address(0), "Unknown order");
+         require(!order.executed, "Order already executed");
+         orders[digest].executed = true;
+
+         uint256 realizedProfitWei = 0;
+         if (realizedProfitWei > 0) {
+             _distributeProfitNative(order.solver, realizedProfitWei);
+         }
+
+         emit ArbExecuted(digest, order.solver, realizedProfitWei);
+         return true;
+     }
+
+     function _distributeProfitNative(address solver, uint256 amount) internal {
+         uint256 toSolver = (amount * 90) / 100;
+         uint256 toTreasury = amount - toSolver;
+         if (toSolver > 0) {
+             (bool ok1, ) = payable(solver).call{value: toSolver}("");
+             require(ok1, "Solver payout failed");
+         }
+         if (toTreasury > 0) {
+             (bool ok2, ) = payable(treasury).call{value: toTreasury}("");
+             require(ok2, "Treasury payout failed");
+         }
+     }
+
+     receive() external payable {}
+ }

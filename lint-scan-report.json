@@ -1,0 +1,41 @@
+{
+  "scanned": 6,
+  "files_with_issues": 2,
+  "details": [
+    {
+      "file": "contracts/GaslessFlashArbAaveV3.sol",
+      "issues": [
+        {
+          "type": "plain_import",
+          "line": 4,
+          "content": "import \"openzeppelin/contracts/utils/cryptography/ECDSA.sol\";"
+        },
+        {
+          "type": "plain_import",
+          "line": 5,
+          "content": "import \"openzeppelin/contracts/utils/cryptography/EIP712.sol\";"
+        }
+      ]
+    },
+    {
+      "file": "test/ArbAaveV3.t.sol",
+      "issues": [
+        {
+          "type": "plain_import",
+          "line": 3,
+          "content": "import \"forge-std/Test.sol\";"
+        },
+        {
+          "type": "plain_import",
+          "line": 4,
+          "content": "import \"../contracts/UniswapV4ValidationHook.sol\";"
+        },
+        {
+          "type": "plain_import",
+          "line": 5,
+          "content": "import \"../contracts/GaslessFlashArbAaveV3.sol\";"
+        }
+      ]
+    }
+  ]
+}

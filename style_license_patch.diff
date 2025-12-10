@@ -1,0 +1,78 @@
+*** Begin Patch
+*** Add File: .editorconfig
++root = true
++
++[*]
++indent_style = space
++indent_size = 2
++end_of_line = lf
++charset = utf-8
++trim_trailing_whitespace = true
++insert_final_newline = true
++
++[*.{sol,js,ts,json,md}]
++max_line_length = 120
+*** End Patch
+
+*** Begin Patch
+*** Add File: .prettierrc
++{
++  "printWidth": 100,
++  "tabWidth": 2,
++  "useTabs": false,
++  "semi": true,
++  "singleQuote": true,
++  "bracketSpacing": true,
++  "trailingComma": "none",
++  "endOfLine": "lf"
++}
+*** End Patch
+
+*** Begin Patch
+*** Update File: contracts/GaslessFlashArbAaveV3.sol
+@@ -1,3 +1,12 @@
++// SPDX-License-Identifier: MIT
++/**
++ * @title Gasless Flash Arbitrage Executor (Aave V3)
++ * @author  
++ * @notice Allows solver-signed EIP-712 orders, optional Aave v3 flash loans, and profit distribution.
++ * @dev Use this contract as a basis. Ensure safety of ERC-20 repayment / WETH wrap / pool validation before mainnet deployment.
++ */
+ pragma solidity ^0.8.24;
+
+ import { ECDSA } from "openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+*** End Patch
+
+*** Begin Patch
+*** Update File: contracts/UniswapV4ValidationHook.sol
+@@ -1,3 +1,11 @@
++// SPDX-License-Identifier: MIT
++/**
++ * @title UniswapV4ValidationHook
++ * @notice Validation hook to gate solver orders by allowed solvers and minimum profit threshold.
++ * @dev Simple, auditable hook — consider multisig + governance for production.
++ */
+ pragma solidity ^0.8.24;
+
+ contract UniswapV4ValidationHook {
+*** End Patch
+
+*** Begin Patch
+*** Update File: test/ArbAaveV3.t.sol
+@@ -1,2 +1,4 @@
++// SPDX-License-Identifier: MIT
++// (Test file — no license requirement but MIT for consistency)
+ pragma solidity ^0.8.24;
+
+ import "forge-std/Test.sol";
+*** End Patch
+
+*** Begin Patch
+*** Update File: test/Counter.t.sol
+@@ -1,2 +1,4 @@
++// SPDX-License-Identifier: MIT
++// Simple counter test (scaffold) — MIT license
+ pragma solidity ^0.8.20;
+
+ import "forge-std/Test.sol";
+*** End Patch

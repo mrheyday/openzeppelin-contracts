@@ -1,0 +1,155 @@
+*** Begin Patch
+*** Update File: foundry.toml
+@@
+-[profile.default]
+-src = "contracts"
+-out = "out"
+-libs = ["lib"]
+-solc_version = "0.8.24"
+-optimizer = true
+-optimizer_runs = 200
++[profile.default]
++src = "contracts"
++out = "out"
++libs = ["lib"]
++solc_version = "0.8.24"
++optimizer = true
++optimizer_runs = 200
+*** End Patch
+
+*** Begin Patch
+*** Add File: remappings.txt
++openzeppelin/=lib/openzeppelin-contracts/
++forge-std/=lib/forge-std/src/
++@uniswap/v3-core/=lib/v3-core/contracts/
++@uniswap/v3-periphery/=lib/v3-periphery/contracts/
+*** End Patch
+
+*** Begin Patch
+*** Update File: contracts/GaslessFlashArbAaveV3.sol
+@@
+- import "openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+- import "openzeppelin/contracts/utils/cryptography/EIP712.sol";
++ import { ECDSA } from "openzeppelin/contracts/utils/cryptography/ECDSA.sol";
++ import { EIP712 } from "openzeppelin/contracts/utils/cryptography/EIP712.sol";
+@@
+-    modifier onlyOwner() {
+-        require(msg.sender == owner, "Only owner");
+-        _;
+-    }
++    modifier onlyOwner() {
++        _onlyOwner();
++        _;
++    }
++
++    function _onlyOwner() internal view {
++        require(msg.sender == owner, "Only owner");
++    }
+@@
+-    modifier nonReentrant() {
+-        require(_locked == 0, "Reentrancy");
+-        _locked = 1;
+-        _;
+-        _locked = 0;
+-    }
++    modifier nonReentrant() {
++        _nonReentrantBefore();
++        _;
++        _nonReentrantAfter();
++    }
++
++    function _nonReentrantBefore() internal {
++        require(_locked == 0, "Reentrancy");
++        _locked = 1;
++    }
++
++    function _nonReentrantAfter() internal {
++        _locked = 0;
++    }
+*** End Patch
+
+*** Begin Patch
+*** Update File: contracts/UniswapV4ValidationHook.sol
+@@
+-    modifier onlyOwner() {
+-        require(msg.sender == owner, "Only owner");
+-        _;
+-    }
++    modifier onlyOwner() {
++        _onlyOwner();
++        _;
++    }
++
++    function _onlyOwner() internal view {
++        require(msg.sender == owner, "Only owner");
++    }
+*** End Patch
+
+*** Begin Patch
+*** Add File: .github/workflows/ci.yml
++name: CI
++
++on:
++  push:
++    branches: [ main ]
++  pull_request:
++
++jobs:
++  check:
++    name: Forge build & test
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++        with:
++          submodules: true
++      - name: Install Foundry
++        uses: foundry-rs/foundry-toolchain@v1
++        with:
++          version: stable
++      - name: Cache Foundry libs
++        uses: actions/cache@v4
++        with:
++          path: lib
++          key: ${{ runner.os }}-foundry-libs-${{ hashFiles('lib/**') }}
++      - name: Forge build
++        run: forge build --sizes
++      - name: Forge test
++        run: forge test -vvv
++      - name: Lint code
++        run: forge lint --severity high,gas,code-size || true
+*** End Patch
+
+*** Begin Patch
+*** Update File: README.md
+@@
+-This repository contains a scaffold for a gasless flash-arbitrage framework:
++This repository contains a scaffold for a gasless flash-arbitrage framework:
+  - Flash-loan integration (Aave v3)
+  - On-chain order storage + EIP-712 signing + replay protection
+  - (Optional) Gasless execution via Gelato Relay SDK + ERC-2771 forwarder
+  - Foundry tests, CI workflow, and modular architecture
+-
+-Contracts target **Solidity 0.8.20**.
++Contracts target **Solidity 0.8.24** (compatible with current OpenZeppelin contracts).
+ 
+ ## 🧪 Build & Test
+-
+-```bash
+-forge clean
+-forge build
+-forge test -v
+-```
++```bash
++forge clean
++forge build
++forge test -v
++```
+ 
+ ## 🚀 Continuous Integration
+-
+-A GitHub Actions workflow (`.github/workflows/ci.yml`) will automatically run on every push/pull request, building, testing and linting the code.
++A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push or pull request, building, testing and linting the code automatically.
+ 
+ ## ✅ Code Style & Best Practices
+- (unchanged) …
+*** End Patch
